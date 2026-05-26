@@ -57,6 +57,8 @@ app.get('/', async (req, res) => {
         <img src="/uploads/${f}" loading="lazy">
         <div class="thumb-meta">${f}</div>
       </a>
+      <a class="thumb-dl" href="/uploads/${f}" download="${f}" title="Tải xuống">↓</a>
+      <button class="thumb-cp" onclick="copyImage(this, '/uploads/${f}')" title="Copy ảnh">⎘</button>
     </div>`).join('');
 
   const lanUrl = `http://${getLocalIP()}:${PORT}`;
@@ -269,6 +271,7 @@ app.get('/', async (req, res) => {
     }
     .thumb:hover { border-color: var(--border-hi); }
     .thumb a { display:block; height:100%; }
+    .thumb a.thumb-dl { height:26px; }
     .thumb img {
       width:100%; height:100%;
       object-fit: cover;
@@ -290,6 +293,40 @@ app.get('/', async (req, res) => {
       transition: opacity .15s;
     }
     .thumb:hover .thumb-meta { opacity: 1; }
+    .thumb-dl {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 26px; height: 26px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity .15s, background .12s;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 11px;
+    }
+    .thumb:hover .thumb-dl { opacity: 1; }
+    .thumb-dl:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+    .thumb-cp {
+      position: absolute;
+      top: 6px; right: 36px;
+      width: 26px; height: 26px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity .15s, background .12s;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .thumb:hover .thumb-cp { opacity: 1; }
+    .thumb-cp:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+    .thumb-cp.copied { background: #2a2; border-color: #2a2; color: #fff; opacity: 1; }
     /* new badge (fades after 4s via JS) */
     .thumb-new { border-color: var(--accent) !important; }
     .thumb-new::after {
@@ -448,10 +485,25 @@ app.get('/', async (req, res) => {
       if (empty) empty.remove();
       const div = document.createElement('div');
       div.className = 'thumb' + (isNew ? ' thumb-new' : '');
-      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a>';
+      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Tải xuống">↓</a><button class="thumb-cp" onclick="copyImage(this, \'' + url + '\')" title="Copy ảnh">⎘</button>';
       gallery.prepend(div);
       countEl.textContent = gallery.querySelectorAll('.thumb').length;
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
+    }
+
+    async function copyImage(btn, url) {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const mime = blob.type.startsWith('image/') ? blob.type : 'image/png';
+        await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+        btn.textContent = '✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '⎘'; btn.classList.remove('copied'); }, 2000);
+      } catch {
+        btn.textContent = '✗';
+        setTimeout(() => { btn.textContent = '⎘'; }, 2000);
+      }
     }
 
     async function clearFiles() {
