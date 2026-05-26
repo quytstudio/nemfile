@@ -4,10 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
+const localtunnel = require('localtunnel');
 
 const app = express();
 const PORT = 3333;
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 
@@ -23,6 +24,8 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // SSE clients (máy tính đang mở trang web)
 const sseClients = new Set();
+
+let publicUrl = null;
 
 app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -56,19 +59,22 @@ app.get('/', async (req, res) => {
       </a>
     </div>`).join('');
 
-  const ipadUrl = `http://${getLocalIP()}:${PORT}`;
-  const qrDataUrl = await QRCode.toDataURL(ipadUrl, {
-    width: 140,
-    margin: 1,
+  const lanUrl = `http://${getLocalIP()}:${PORT}`;
+  const qrLan = await QRCode.toDataURL(lanUrl, {
+    width: 140, margin: 1,
     color: { dark: '#c8c8c8', light: '#0a0a0a' },
   });
+  const qrPublic = publicUrl ? await QRCode.toDataURL(publicUrl, {
+    width: 140, margin: 1,
+    color: { dark: '#f97316', light: '#0a0a0a' },
+  }) : null;
 
   res.send(`<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SCR//DROP</title>
+  <title>NEM//FILE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -232,6 +238,20 @@ app.get('/', async (req, res) => {
       letter-spacing: 1px;
     }
     .g-line { flex:1; height:1px; background: var(--border-hi); }
+    .btn-clear {
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border-hi);
+      padding: 4px 12px;
+      cursor: pointer;
+      transition: color .12s, border-color .12s;
+    }
+    .btn-clear:hover { color: #e55; border-color: #e55; }
 
     /* ── Gallery grid ── */
     .gallery {
@@ -295,13 +315,19 @@ app.get('/', async (req, res) => {
     }
 
     /* ── QR ── */
-    .qr {
+    .qr-group {
       position: fixed;
       bottom: 24px; right: 24px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      z-index: 100;
+    }
+    .qr {
+      position: relative;
       background: var(--surface);
       border: 1px solid var(--border-hi);
       padding: 10px 10px 8px;
-      z-index: 100;
     }
     .qr::before {
       content: '';
@@ -311,39 +337,48 @@ app.get('/', async (req, res) => {
       border-top:2px solid var(--accent);
       border-left:2px solid var(--accent);
     }
-    .qr img { display:block; width:104px; height:104px; }
+    .qr.tunnel::before { border-color: var(--accent); }
+    .qr img { display:block; width:96px; height:96px; }
     .qr-tag {
-      font-size: 0.52rem;
+      font-size: 0.5rem;
       text-transform: uppercase;
       letter-spacing: 2px;
       color: var(--muted);
       text-align: center;
       margin-top: 7px;
     }
+    .qr.tunnel .qr-tag { color: var(--accent); }
     .qr-url {
-      font-size: 0.47rem;
+      font-size: 0.44rem;
       color: var(--muted);
       text-align: center;
       margin-top: 2px;
       word-break: break-all;
-      max-width: 104px;
+      max-width: 96px;
     }
   </style>
 </head>
 <body>
-  <div class="qr">
-    <img src="${qrDataUrl}" alt="QR">
-    <div class="qr-tag">SCAN // IPAD</div>
-    <div class="qr-url">${ipadUrl}</div>
+  <div class="qr-group">
+    <div class="qr">
+      <img src="${qrLan}" alt="LAN QR">
+      <div class="qr-tag">// LAN</div>
+      <div class="qr-url">${lanUrl}</div>
+    </div>
+    ${qrPublic ? `<div class="qr tunnel">
+      <img src="${qrPublic}" alt="Public QR">
+      <div class="qr-tag">// PUBLIC</div>
+      <div class="qr-url">${publicUrl}</div>
+    </div>` : ''}
   </div>
 
   <div class="wrap">
     <header>
-      <div class="logo">SCR<em>//</em>DROP</div>
+      <div class="logo">NEM<em>//</em>FILE</div>
       <div class="header-right">
         <span class="pulse"></span>ONLINE · :${PORT}<br>
-        SCREENSHOT TRANSFER SYS<br>
-        v1.0.0
+        ${publicUrl ? '<span style="color:var(--accent)">// PUBLIC TUNNEL ACTIVE</span>' : '// LAN ONLY'}<br>
+        SCREENSHOT TRANSFER SYS
       </div>
     </header>
 
@@ -359,6 +394,7 @@ app.get('/', async (req, res) => {
       <span class="g-label">Transfer Log</span>
       <span class="g-count" id="count">${files.length}</span>
       <div class="g-line"></div>
+      <button class="btn-clear" id="clearBtn" onclick="clearFiles()">[ CLEAR ]</button>
     </div>
 
     <div class="gallery" id="gallery">
@@ -418,6 +454,18 @@ app.get('/', async (req, res) => {
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
     }
 
+    async function clearFiles() {
+      if (!confirm('Xoá tất cả file?')) return;
+      const res = await fetch('/clear', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('gallery').innerHTML = '<p class="empty">// NO FILES TRANSFERRED</p>';
+        countEl.textContent = '0';
+        setStatus('// CLEARED — ' + data.deleted + ' FILES', true);
+        setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
+      }
+    }
+
     // Realtime từ iPad
     const es = new EventSource('/events');
     es.onmessage = e => {
@@ -431,6 +479,12 @@ app.get('/', async (req, res) => {
 </html>`);
 });
 
+app.delete('/clear', (req, res) => {
+  const files = fs.readdirSync(UPLOADS_DIR);
+  files.forEach(f => fs.unlinkSync(path.join(UPLOADS_DIR, f)));
+  res.json({ ok: true, deleted: files.length });
+});
+
 app.post('/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.json({ ok: false, error: 'Không có file' });
   const payload = { filename: req.file.filename, url: '/uploads/' + req.file.filename };
@@ -441,16 +495,35 @@ app.post('/upload', upload.single('image'), (req, res) => {
   res.json({ ok: true, ...payload });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  const nets = os.networkInterfaces();
+app.listen(PORT, '0.0.0.0', async () => {
   console.log('\nScreenshot Drop đang chạy:\n');
-  console.log('  Local:  http://localhost:' + PORT);
-  for (const list of Object.values(nets)) {
+  console.log('  Local:   http://localhost:' + PORT);
+
+  for (const list of Object.values(os.networkInterfaces())) {
     for (const net of list) {
       if (net.family === 'IPv4' && !net.internal) {
-        console.log('  iPad:   http://' + net.address + ':' + PORT + '   ← mở cái này trên iPad');
+        console.log('  LAN:     http://' + net.address + ':' + PORT);
       }
     }
   }
-  console.log('\nMáy tính và iPad phải cùng mạng WiFi.\n');
+
+  console.log('\n  Đang tạo tunnel public...');
+  try {
+    const tunnel = await localtunnel({ port: PORT });
+    publicUrl = tunnel.url;
+    console.log('  Public:  ' + publicUrl + '  ← dùng cái này khi khác mạng\n');
+    console.log('  (Lần đầu mở link có thể hỏi xác nhận — bấm "Click to Continue")\n');
+
+    tunnel.on('close', () => {
+      publicUrl = null;
+      console.log('  Tunnel đã đóng.');
+    });
+    tunnel.on('error', err => {
+      publicUrl = null;
+      console.error('  Tunnel lỗi:', err.message);
+    });
+  } catch (err) {
+    console.error('  Không tạo được tunnel:', err.message);
+    console.log('  → Chỉ dùng được trong LAN.\n');
+  }
 });

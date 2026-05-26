@@ -1,12 +1,23 @@
 {
-  "name": "screenshot-drop",
+  "name": "nemfile",
   "version": "1.0.0",
+  "description": "Drop files from any device to your computer via local network or public tunnel",
   "main": "server.js",
+  "bin": {
+    "nemfile": "./bin/nemfile.js"
+  },
+  "files": [
+    "bin/",
+    "server.js"
+  ],
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": ["file", "upload", "transfer", "lan", "tunnel", "ipad"],
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
+    "localtunnel": "^2.0.2",
     "multer": "^1.4.5-lts.1",
     "qrcode": "^1.5.4"
   }
