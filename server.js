@@ -58,7 +58,7 @@ app.get('/', async (req, res) => {
         <div class="thumb-meta">${f}</div>
       </a>
       <a class="thumb-dl" href="/uploads/${f}" download="${f}" title="Tải xuống">↓</a>
-      <button class="thumb-cp" onclick="copyImage(this, '/uploads/${f}')" title="Copy ảnh">⎘</button>
+      <button class="thumb-cp" data-url="/uploads/${f}" onclick="copyImage(this)" title="Copy ảnh">⎘</button>
     </div>`).join('');
 
   const lanUrl = `http://${getLocalIP()}:${PORT}`;
@@ -485,13 +485,14 @@ app.get('/', async (req, res) => {
       if (empty) empty.remove();
       const div = document.createElement('div');
       div.className = 'thumb' + (isNew ? ' thumb-new' : '');
-      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Tải xuống">↓</a><button class="thumb-cp" onclick="copyImage(this, \'' + url + '\')" title="Copy ảnh">⎘</button>';
+      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Tải xuống">↓</a><button class="thumb-cp" data-url="' + url + '" onclick="copyImage(this)" title="Copy ảnh">⎘</button>';
       gallery.prepend(div);
       countEl.textContent = gallery.querySelectorAll('.thumb').length;
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
     }
 
-    async function copyImage(btn, url) {
+    async function copyImage(btn) {
+      const url = btn.dataset.url;
       try {
         const res = await fetch(url);
         const blob = await res.blob();
