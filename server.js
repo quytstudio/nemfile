@@ -57,8 +57,8 @@ app.get('/', async (req, res) => {
         <img src="/uploads/${f}" loading="lazy">
         <div class="thumb-meta">${f}</div>
       </a>
-      <a class="thumb-dl" href="/uploads/${f}" download="${f}" title="Tải xuống">↓</a>
-      <button class="thumb-cp" data-url="/uploads/${f}" onclick="copyImage(this)" title="Copy ảnh">⎘</button>
+      <a class="thumb-dl" href="/uploads/${f}" download="${f}" title="Download">↓</a>
+      <button class="thumb-cp" data-url="/uploads/${f}" onclick="copyImage(this)" title="Copy image">⎘</button>
     </div>`).join('');
 
   const lanUrl = `http://${getLocalIP()}:${PORT}`;
@@ -420,7 +420,7 @@ app.get('/', async (req, res) => {
     </header>
 
     <div class="drop-zone" id="dropzone">
-      <span class="drop-label">DROP FILE — HOẶC CHỌN TỪ THƯ VIỆN</span>
+      <span class="drop-label">DROP FILE — OR SELECT FROM LIBRARY</span>
       <input type="file" id="fileInput" accept="image/*" multiple>
       <button class="btn" onclick="document.getElementById('fileInput').click()">[ SELECT FILE ]</button>
     </div>
@@ -485,7 +485,7 @@ app.get('/', async (req, res) => {
       if (empty) empty.remove();
       const div = document.createElement('div');
       div.className = 'thumb' + (isNew ? ' thumb-new' : '');
-      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Tải xuống">↓</a><button class="thumb-cp" data-url="' + url + '" onclick="copyImage(this)" title="Copy ảnh">⎘</button>';
+      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Download">↓</a><button class="thumb-cp" data-url="' + url + '" onclick="copyImage(this)" title="Copy image">⎘</button>';
       gallery.prepend(div);
       countEl.textContent = gallery.querySelectorAll('.thumb').length;
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
@@ -508,18 +508,18 @@ app.get('/', async (req, res) => {
     }
 
     async function clearFiles() {
-      if (!confirm('Xoá tất cả file?')) return;
+      if (!confirm('Delete all files?')) return;
       const res = await fetch('/clear', { method: 'DELETE' });
       const data = await res.json();
       if (data.ok) {
         document.getElementById('gallery').innerHTML = '<p class="empty">// NO FILES TRANSFERRED</p>';
         countEl.textContent = '0';
-        setStatus('// CLEARED — ' + data.deleted + ' FILES', true);
+        setStatus('// CLEARED — ' + data.deleted + ' FILE(S)', true);
         setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
       }
     }
 
-    // Realtime từ iPad
+    // Realtime from any device
     const es = new EventSource('/events');
     es.onmessage = e => {
       const { filename, url } = JSON.parse(e.data);
@@ -539,9 +539,9 @@ app.delete('/clear', (req, res) => {
 });
 
 app.post('/upload', upload.single('image'), (req, res) => {
-  if (!req.file) return res.json({ ok: false, error: 'Không có file' });
+  if (!req.file) return res.json({ ok: false, error: 'No file received' });
   const payload = { filename: req.file.filename, url: '/uploads/' + req.file.filename };
-  // Đẩy event tới tất cả browser đang mở trang
+  // Push event to all connected browsers
   for (const client of sseClients) {
     client.write(`data: ${JSON.stringify(payload)}\n\n`);
   }
@@ -560,23 +560,23 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
   }
 
-  console.log('\n  Đang tạo tunnel public...');
+  console.log('\n  Starting public tunnel...');
   try {
     const tunnel = await localtunnel({ port: PORT });
     publicUrl = tunnel.url;
-    console.log('  Public:  ' + publicUrl + '  ← dùng cái này khi khác mạng\n');
-    console.log('  (Lần đầu mở link có thể hỏi xác nhận — bấm "Click to Continue")\n');
+    console.log('  Public:  ' + publicUrl + '  ← use this outside LAN\n');
+    console.log('  (First visit may ask for confirmation — click "Click to Continue")\n');
 
     tunnel.on('close', () => {
       publicUrl = null;
-      console.log('  Tunnel đã đóng.');
+      console.log('  Tunnel closed.');
     });
     tunnel.on('error', err => {
       publicUrl = null;
-      console.error('  Tunnel lỗi:', err.message);
+      console.error('  Tunnel error:', err.message);
     });
   } catch (err) {
-    console.error('  Không tạo được tunnel:', err.message);
-    console.log('  → Chỉ dùng được trong LAN.\n');
+    console.error('  Could not create tunnel:', err.message);
+    console.log('  → LAN only.\n');
   }
 });
