@@ -22,11 +22,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-// SSE clients (máy tính đang mở trang web)
 const sseClients = new Set();
-
+const textClips = []; // in-memory, max 50
 let publicUrl = null;
 
+app.use(express.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.get('/events', (req, res) => {
@@ -204,6 +204,87 @@ app.get('/', async (req, res) => {
       -webkit-tap-highlight-color: transparent;
     }
     .btn:hover, .btn:active { background: var(--accent); color: #000; }
+
+    /* ── Text clip zone ── */
+    .text-zone {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      margin-bottom: 32px;
+    }
+    .text-zone::after {
+      content: '';
+      position: absolute;
+      bottom:-1px; right:-1px;
+      width:12px; height:12px;
+      border-bottom:2px solid var(--accent);
+      border-right:2px solid var(--accent);
+    }
+    .text-area-wrap { display: flex; gap: 0; }
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border-hi);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 14px 16px;
+      resize: none;
+      height: 80px;
+      outline: none;
+      line-height: 1.6;
+    }
+    textarea::placeholder { color: var(--faint); }
+    .btn-send {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      background: transparent;
+      color: var(--accent);
+      border: none;
+      padding: 0 20px;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+      white-space: nowrap;
+    }
+    .btn-send:hover { background: var(--accent); color: #000; }
+    .clips { border-top: 1px solid var(--border); }
+    .clip-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+    }
+    .clip-item:last-child { border-bottom: none; }
+    .clip-item:hover { background: rgba(255,255,255,0.02); }
+    .clip-text {
+      flex: 1;
+      font-size: 0.72rem;
+      color: var(--text);
+      line-height: 1.6;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .clip-copy {
+      font-family: var(--mono);
+      font-size: 0.55rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border-hi);
+      padding: 3px 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color .12s, border-color .12s;
+    }
+    .clip-copy:hover { color: var(--accent); border-color: var(--accent); }
+    .clip-copy.ok { color: #4c4; border-color: #4c4; }
 
     /* ── Status ── */
     #status {
@@ -425,6 +506,16 @@ app.get('/', async (req, res) => {
       <button class="btn" onclick="document.getElementById('fileInput').click()">[ SELECT FILE ]</button>
     </div>
 
+    <div class="text-zone">
+      <div class="text-area-wrap">
+        <textarea id="textInput" placeholder="Paste or type text to share across devices..."></textarea>
+        <button class="btn-send" onclick="sendText()">[ SEND ]</button>
+      </div>
+      <div class="clips" id="clips">
+        ${textClips.map(c => `<div class="clip-item" data-id="${c.id}"><span class="clip-text">${c.text.replace(/</g,'&lt;')}</span><button class="clip-copy" onclick="copyClip(this)">COPY</button></div>`).join('') }
+      </div>
+    </div>
+
     <div id="status">// AWAITING INPUT</div>
 
     <div class="gallery-header">
@@ -491,6 +582,36 @@ app.get('/', async (req, res) => {
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
     }
 
+    async function sendText() {
+      const ta = document.getElementById('textInput');
+      const text = ta.value.trim();
+      if (!text) return;
+      ta.value = '';
+      await fetch('/text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+    }
+
+    document.getElementById('textInput').addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sendText();
+    });
+
+    function prependClip(clip) {
+      const clips = document.getElementById('clips');
+      const div = document.createElement('div');
+      div.className = 'clip-item';
+      div.dataset.id = clip.id;
+      div.innerHTML = '<span class="clip-text">' + clip.text.replace(/</g,'&lt;') + '</span><button class="clip-copy" onclick="copyClip(this)">COPY</button>';
+      clips.prepend(div);
+    }
+
+    function copyClip(btn) {
+      const text = btn.previousElementSibling.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'OK';
+        btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('ok'); }, 2000);
+      });
+    }
+
     async function copyImage(btn) {
       const url = btn.dataset.url;
       try {
@@ -527,9 +648,25 @@ app.get('/', async (req, res) => {
       setStatus('// RECEIVED — ' + filename, true);
       setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
     };
+    es.addEventListener('clip', e => {
+      const clip = JSON.parse(e.data);
+      prependClip(clip);
+    });
   </script>
 </body>
 </html>`);
+});
+
+app.post('/text', (req, res) => {
+  const text = (req.body.text || '').trim();
+  if (!text) return res.json({ ok: false, error: 'Empty' });
+  const clip = { id: Date.now(), text };
+  textClips.unshift(clip);
+  if (textClips.length > 50) textClips.pop();
+  for (const client of sseClients) {
+    client.write(`event: clip\ndata: ${JSON.stringify(clip)}\n\n`);
+  }
+  res.json({ ok: true, clip });
 });
 
 app.delete('/clear', (req, res) => {
