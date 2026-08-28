@@ -15,12 +15,13 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 const storage = multer.diskStorage({
   destination: UPLOADS_DIR,
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.png';
-    cb(null, `screenshot-${Date.now()}${ext}`);
+    const ext = path.extname(file.originalname) || '';
+    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+    cb(null, `${Date.now()}-${base}${ext}`);
   },
 });
 
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2GB
 
 const sseClients = new Set();
 const textClips = []; // in-memory, max 50
@@ -46,20 +47,32 @@ function getLocalIP() {
 }
 
 app.get('/', async (req, res) => {
-  const files = fs.readdirSync(UPLOADS_DIR)
-    .filter(f => /\.(png|jpg|jpeg|gif|webp|heic)$/i.test(f))
-    .sort()
-    .reverse();
+  const files = fs.readdirSync(UPLOADS_DIR).sort().reverse();
 
-  const gallery = files.map(f => `
+  const isImage = f => /\.(png|jpg|jpeg|gif|webp|heic|avif)$/i.test(f);
+  const isVideo = f => /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(f);
+
+  const gallery = files.map(f => {
+    const url = `/uploads/${f}`;
+    const preview = isImage(f)
+      ? `<img src="${url}" loading="lazy">`
+      : isVideo(f)
+        ? `<video src="${url}" muted playsinline preload="metadata"></video><div class="play-icon">▶</div>`
+        : `<div class="file-icon">${path.extname(f).slice(1).toUpperCase() || 'FILE'}</div>`;
+    const copyBtn = isImage(f)
+      ? `<button class="thumb-cp" data-url="${url}" onclick="copyImage(this)" title="Copy image">⎘</button>`
+      : '';
+    return `
     <div class="thumb">
-      <a href="/uploads/${f}" target="_blank">
-        <img src="/uploads/${f}" loading="lazy">
+      <a href="${url}" target="_blank">
+        ${preview}
         <div class="thumb-meta">${f}</div>
       </a>
-      <a class="thumb-dl" href="/uploads/${f}" download="${f}" title="Download">↓</a>
-      <button class="thumb-cp" data-url="/uploads/${f}" onclick="copyImage(this)" title="Copy image">⎘</button>
-    </div>`).join('');
+      <a class="thumb-dl" href="${url}" download="${f}" title="Download">↓</a>
+      <button class="thumb-ln" data-url="${url}" onclick="copyLink(this)" title="Copy LAN link">URL</button>
+      ${copyBtn}
+    </div>`;
+  }).join('');
 
   const lanUrl = `http://${getLocalIP()}:${PORT}`;
   const qrLan = await QRCode.toDataURL(lanUrl, {
@@ -176,9 +189,14 @@ app.get('/', async (req, res) => {
     .drop-zone::before { top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); }
     .drop-zone::after  { bottom:-1px; right:-1px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
 
-    .drop-zone.drag, .drop-zone:hover {
+    .drop-zone.drag, .drop-zone.paste, .drop-zone:hover {
       border-color: var(--accent);
       background: var(--accent-dim);
+    }
+    .drop-zone.paste { animation: pasteFlash .5s ease; }
+    @keyframes pasteFlash {
+      0% { background: rgba(249,115,22,0.35); }
+      100% { background: var(--accent-dim); }
     }
     .drop-label {
       font-family: var(--display);
@@ -374,6 +392,23 @@ app.get('/', async (req, res) => {
       transition: opacity .15s;
     }
     .thumb:hover .thumb-meta { opacity: 1; }
+    .thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+    .play-icon {
+      position: absolute;
+      inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      color: rgba(255,255,255,0.8);
+      pointer-events: none;
+    }
+    .file-icon {
+      width:100%; height:100%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--display);
+      font-size: 1.4rem;
+      color: var(--muted);
+      letter-spacing: 2px;
+    }
     .thumb-dl {
       position: absolute;
       top: 6px; right: 6px;
@@ -390,9 +425,30 @@ app.get('/', async (req, res) => {
     }
     .thumb:hover .thumb-dl { opacity: 1; }
     .thumb-dl:hover { background: var(--accent); color: #000; border-color: var(--accent); }
-    .thumb-cp {
+    .thumb-ln {
       position: absolute;
       top: 6px; right: 36px;
+      width: 26px; height: 26px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity .15s, background .12s;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .thumb:hover .thumb-ln { opacity: 1; }
+    .thumb-ln:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+    .thumb-ln.copied { background: #2a2; border-color: #2a2; color: #fff; opacity: 1; }
+    .thumb-cp {
+      position: absolute;
+      top: 6px; right: 66px;
       width: 26px; height: 26px;
       background: rgba(0,0,0,0.7);
       border: 1px solid var(--border-hi);
@@ -501,8 +557,8 @@ app.get('/', async (req, res) => {
     </header>
 
     <div class="drop-zone" id="dropzone">
-      <span class="drop-label">DROP FILE — OR SELECT FROM LIBRARY</span>
-      <input type="file" id="fileInput" accept="image/*" multiple>
+      <span class="drop-label">DROP FILE — PASTE ⌘/CTRL+V — OR SELECT FROM LIBRARY</span>
+      <input type="file" id="fileInput" multiple>
       <button class="btn" onclick="document.getElementById('fileInput').click()">[ SELECT FILE ]</button>
     </div>
 
@@ -531,6 +587,7 @@ app.get('/', async (req, res) => {
   </div>
 
   <script>
+    const LAN_BASE = '${lanUrl}';
     const input = document.getElementById('fileInput');
     const statusEl = document.getElementById('status');
     const dropzone = document.getElementById('dropzone');
@@ -548,6 +605,29 @@ app.get('/', async (req, res) => {
       e.preventDefault();
       dropzone.classList.remove('drag');
       uploadFiles(Array.from(e.dataTransfer.files));
+    });
+
+    // Paste screenshot / image from clipboard (Ctrl+V / Cmd+V)
+    document.addEventListener('paste', e => {
+      const cd = e.clipboardData || window.clipboardData;
+      if (!cd) return;
+      const stamp = Date.now();
+      const files = Array.from(cd.items || [])
+        .filter(it => it.kind === 'file' && it.type.startsWith('image/'))
+        .map(it => it.getAsFile())
+        .filter(Boolean)
+        .map((f, i) => {
+          const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+          const generic = !f.name || /^(image|pasted)/i.test(f.name);
+          if (!generic) return f;
+          const name = 'screenshot-' + stamp + (i ? '-' + i : '') + '.' + ext;
+          return new File([f], name, { type: f.type });
+        });
+      if (!files.length) return;
+      e.preventDefault();
+      dropzone.classList.add('paste');
+      setTimeout(() => dropzone.classList.remove('paste'), 600);
+      uploadFiles(files);
     });
 
     async function uploadFiles(files) {
@@ -570,13 +650,25 @@ app.get('/', async (req, res) => {
       setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
     }
 
+    const isImg = f => /\.(png|jpg|jpeg|gif|webp|heic|avif)$/i.test(f);
+    const isVid = f => /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(f);
+
     function prependToGallery(filename, url, isNew) {
       const gallery = document.getElementById('gallery');
       const empty = gallery.querySelector('.empty');
       if (empty) empty.remove();
+      const ext = filename.split('.').pop().toUpperCase();
+      const preview = isImg(filename)
+        ? '<img src="' + url + '" loading="lazy">'
+        : isVid(filename)
+          ? '<video src="' + url + '" muted playsinline preload="metadata"></video><div class="play-icon">▶</div>'
+          : '<div class="file-icon">' + ext + '</div>';
+      const copyBtn = isImg(filename)
+        ? '<button class="thumb-cp" data-url="' + url + '" onclick="copyImage(this)" title="Copy image">⎘</button>'
+        : '';
       const div = document.createElement('div');
       div.className = 'thumb' + (isNew ? ' thumb-new' : '');
-      div.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" loading="lazy"><div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Download">↓</a><button class="thumb-cp" data-url="' + url + '" onclick="copyImage(this)" title="Copy image">⎘</button>';
+      div.innerHTML = '<a href="' + url + '" target="_blank">' + preview + '<div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Download">↓</a><button class="thumb-ln" data-url="' + url + '" onclick="copyLink(this)" title="Copy LAN link">URL</button>' + copyBtn;
       gallery.prepend(div);
       countEl.textContent = gallery.querySelectorAll('.thumb').length;
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
@@ -603,13 +695,46 @@ app.get('/', async (req, res) => {
       clips.prepend(div);
     }
 
-    function copyClip(btn) {
+    // navigator.clipboard needs a secure context — plain http:// on LAN falls back
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch {}
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch {}
+      ta.remove();
+      return ok;
+    }
+
+    function flashBtn(btn, label, cls) {
+      const prev = btn.textContent;
+      btn.textContent = label;
+      btn.classList.add(cls);
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove(cls); }, 2000);
+    }
+
+    async function copyClip(btn) {
       const text = btn.previousElementSibling.textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = 'OK';
-        btn.classList.add('ok');
-        setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('ok'); }, 2000);
-      });
+      const ok = await copyText(text);
+      flashBtn(btn, ok ? 'OK' : 'ERR', 'ok');
+    }
+
+    // Copy the file's LAN address, e.g. http://192.168.1.10:3333/uploads/x.png
+    async function copyLink(btn) {
+      const ok = await copyText(LAN_BASE + btn.dataset.url);
+      flashBtn(btn, ok ? 'OK' : 'ERR', 'copied');
+      setStatus(ok ? '// LINK COPIED — ' + LAN_BASE + btn.dataset.url : '// COPY FAILED', ok);
+      setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
     }
 
     async function copyImage(btn) {
