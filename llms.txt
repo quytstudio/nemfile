@@ -1,0 +1,44 @@
+# nemfile
+
+> nemfile is a zero-config command-line tool that transfers files, screenshots and text between a phone, tablet and computer over a local Wi-Fi network, using a browser on the sending device. No cloud storage, no account, and no mobile app installation.
+
+Install and run with a single command: `npx nemfile`. It starts a local Express server on port 3333, prints a LAN URL and QR code, and saves anything uploaded to an `uploads/` folder on the host computer.
+
+## Key facts
+
+- Package name (npm): `nemfile`
+- Run command: `npx nemfile`, or `npm install -g nemfile` then `nemfile`
+- License: MIT
+- Author: phamquyetthang
+- Repository: https://github.com/quytstudio/nemfile
+- Runtime: Node.js 18+; standalone binaries available for Linux, macOS and Windows
+- Default port: 3333, bound to 0.0.0.0
+- Maximum file size: 2 GB per file
+- Upload destination: `./uploads` relative to the working directory
+
+## What it solves
+
+- Transferring iPhone or iPad screenshots and photos to a Windows or Linux computer without iCloud, iTunes or a cable
+- An AirDrop alternative that works between any two platforms, because the receiving end is a web page
+- Sharing text between devices as a cross-platform clipboard
+- Moving large video files at Wi-Fi speed instead of internet upload speed
+
+## Features
+
+- Drag-and-drop and camera-roll uploads of any file type
+- QR code pairing so no IP address needs to be typed
+- Live gallery with image and video thumbnails
+- Realtime sync across all connected devices via server-sent events
+- Text clip sharing
+- Copy an image to the system clipboard, or copy its LAN URL
+- Optional public HTTPS tunnel (localtunnel) for devices outside the Wi-Fi network
+
+## Privacy
+
+By default all traffic stays on the local network and files are written to the user's own computer. There is no database and no telemetry. The optional public tunnel is the only path that routes traffic through a third party.
+
+## Docs
+
+- [README](https://github.com/quytstudio/nemfile#readme): install, usage, FAQ
+- [Releases](https://github.com/quytstudio/nemfile/releases): standalone binaries
+- [Issues](https://github.com/quytstudio/nemfile/issues): bug reports and feature requests

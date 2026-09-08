@@ -6,9 +6,12 @@ on:
       - 'v*'
 
 jobs:
-  # ── 1. Publish lên npm ──────────────────────────────────────────
+  # ── 1. Publish to npm ───────────────────────────────────────────
   npm-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +22,11 @@ jobs:
 
       - run: npm ci
 
-      - run: npm publish --access public
+      - run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # ── 2. Build binary cho 3 platform ─────────────────────────────
+  # ── 2. Build binaries for 3 platforms ───────────────────────────
   build-binaries:
     runs-on: ubuntu-latest
     needs: npm-publish
@@ -55,7 +58,7 @@ jobs:
           name: ${{ matrix.output }}
           path: dist/${{ matrix.output }}
 
-  # ── 3. Tạo GitHub Release và đính kèm binaries ─────────────────
+  # ── 3. Create the GitHub Release and attach the binaries ────────
   create-release:
     runs-on: ubuntu-latest
     needs: build-binaries
@@ -74,16 +77,19 @@ jobs:
           body: |
             ## nemfile ${{ github.ref_name }}
 
-            ### npx (cần Node)
+            Drop files, screenshots and text from your phone or iPad onto your
+            computer over local Wi-Fi — no cloud, no account, no app install.
+
+            ### npx (needs Node.js 18+)
             ```bash
             npx nemfile
             ```
 
-            ### Standalone binary (không cần cài gì)
-            Tải file phù hợp với OS → chạy thẳng:
+            ### Standalone binary (nothing to install)
+            Download the file for your OS and run it:
             - **Linux**: `chmod +x nemfile-linux && ./nemfile-linux`
             - **macOS**: `chmod +x nemfile-macos && ./nemfile-macos`
-            - **Windows**: chạy `nemfile-win.exe`
+            - **Windows**: run `nemfile-win.exe`
           files: |
             dist/nemfile-linux
             dist/nemfile-macos

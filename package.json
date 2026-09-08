@@ -1,26 +1,85 @@
 {
   "name": "nemfile",
   "version": "1.0.0",
-  "description": "Drop files from any device to your computer via local network or public tunnel",
+  "description": "Send files, screenshots and text between your phone, iPad and computer over local Wi-Fi — no cloud, no account, no app install. One command: npx nemfile.",
+  "keywords": [
+    "file-transfer",
+    "share-files",
+    "send-files",
+    "airdrop",
+    "airdrop-alternative",
+    "airdrop-for-windows",
+    "airdrop-for-android",
+    "phone-to-pc",
+    "iphone-to-pc",
+    "ipad-to-pc",
+    "android-to-pc",
+    "wifi-transfer",
+    "lan",
+    "local-network",
+    "localhost",
+    "qr-code",
+    "upload",
+    "drag-and-drop",
+    "screenshot",
+    "clipboard",
+    "clipboard-sync",
+    "paste",
+    "text-share",
+    "self-hosted",
+    "no-cloud",
+    "offline",
+    "privacy",
+    "tunnel",
+    "localtunnel",
+    "express",
+    "cli",
+    "zero-config",
+    "npx"
+  ],
+  "homepage": "https://github.com/quytstudio/nemfile#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quytstudio/nemfile.git"
+  },
+  "bugs": {
+    "url": "https://github.com/quytstudio/nemfile/issues"
+  },
+  "license": "MIT",
+  "author": "phamquyetthang <quyetthang.phucchi@gmail.com>",
   "main": "server.js",
   "bin": {
     "nemfile": "./bin/nemfile.js"
   },
   "files": [
     "bin/",
-    "server.js"
+    "server.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
   ],
   "scripts": {
     "start": "node server.js",
     "build": "npx @yao-pkg/pkg . --compress GZip --out-path dist"
   },
   "pkg": {
-    "targets": ["node20-linux-x64", "node20-macos-x64", "node20-win-x64"],
-    "assets": ["node_modules/qrcode/**/*"],
+    "targets": [
+      "node20-linux-x64",
+      "node20-macos-x64",
+      "node20-win-x64"
+    ],
+    "assets": [
+      "node_modules/qrcode/**/*"
+    ],
     "outputPath": "dist"
   },
-  "keywords": ["file", "upload", "transfer", "lan", "tunnel", "ipad"],
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "localtunnel": "^2.0.2",

@@ -28,6 +28,18 @@ const textClips = []; // in-memory, max 50
 let publicUrl = null;
 
 app.use(express.json());
+
+// The tunnel URL is publicly reachable, and everything served here is the
+// user's own private drop folder. Keep crawlers out of all of it.
+app.use((req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  next();
+});
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.get('/events', (req, res) => {
@@ -85,11 +97,22 @@ app.get('/', async (req, res) => {
   }) : null;
 
   res.send(`<!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NEM//FILE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NEM//FILE \u2014 drop files from any device</title>
+  <meta name="description" content="Drop files, screenshots and text from your phone or tablet straight onto this computer over local Wi-Fi.">
+  <!-- This page serves the user's own private files, including over the public tunnel. Never index it. -->
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#080808">
+  <meta name="color-scheme" content="dark">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NEM//FILE">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23080808'/%3E%3Cpath d='M16 6v14m0 0l-6-6m6 6l6-6M7 25h18' stroke='%23f97316' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -811,7 +834,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-  console.log('\nScreenshot Drop đang chạy:\n');
+  console.log('\nnemfile is running:\n');
   console.log('  Local:   http://localhost:' + PORT);
 
   for (const list of Object.values(os.networkInterfaces())) {
