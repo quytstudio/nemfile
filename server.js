@@ -153,7 +153,8 @@ app.get('/', async (req, res) => {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
     }
 
-    .wrap { max-width: 980px; margin: 0 auto; padding: 36px 28px 80px; }
+    /* bottom padding clears the fixed QR panel (~150px + 24px offset) */
+    .wrap { max-width: 980px; margin: 0 auto; padding: 36px 28px 200px; }
 
     /* ── Header ── */
     header {
@@ -553,29 +554,66 @@ app.get('/', async (req, res) => {
       word-break: break-all;
       max-width: 96px;
     }
+    /* ── Touch devices ──
+       The thumb actions are hover-revealed, which never fires on a phone —
+       the device most files arrive from. Show them permanently instead. */
+    @media (hover: none) {
+      .thumb-dl, .thumb-ln, .thumb-cp { opacity: 1; }
+      .thumb-meta { opacity: 1; }
+    }
+
+    /* ── Phones ── */
+    @media (max-width: 640px) {
+      body { background-size: 32px 32px; }
+      .wrap { padding: 22px 16px 40px; }
+
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding-bottom: 14px;
+        margin-bottom: 26px;
+      }
+      .logo { font-size: 2.4rem; letter-spacing: 2px; }
+      .header-right { text-align: left; line-height: 1.9; }
+
+      .drop-zone { padding: 32px 18px; }
+      .drop-label { font-size: 0.62rem; letter-spacing: 1px; }
+
+      /* stack the send button under the textarea instead of squeezing both */
+      .text-area-wrap { flex-direction: column; }
+      textarea { height: 64px; border-right: none; border-bottom: 1px solid var(--border-hi); }
+      .btn-send { padding: 13px 0; }
+
+      /* 168px minimum leaves a single giant column at this width */
+      .gallery { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); }
+    }
+
+    /* ── Anywhere the floating panel would sit on top of the page ──
+       Pinned bottom-right, it covers the transfer log on a narrow screen and
+       blocks the [CLEAR] button on a short one (1024x768, say). Only let it
+       float when the viewport is both wide and tall enough for it to stay out
+       of the way; otherwise inline it. The panel is last in the DOM, so it
+       lands at the end of the page — and the QR codes are for pairing from a
+       second device anyway, so they don't need to be pinned. */
+    @media (max-width: 900px), (max-height: 859px) {
+      .wrap { padding-bottom: 40px; }
+      .qr-group {
+        position: static;
+        justify-content: center;
+        padding: 0 16px 40px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="qr-group">
-    <div class="qr">
-      <img src="${qrLan}" alt="LAN QR">
-      <div class="qr-tag">// LAN</div>
-      <div class="qr-url">${lanUrl}</div>
-    </div>
-    ${qrPublic ? `<div class="qr tunnel">
-      <img src="${qrPublic}" alt="Public QR">
-      <div class="qr-tag">// PUBLIC</div>
-      <div class="qr-url">${publicUrl}</div>
-    </div>` : ''}
-  </div>
-
   <div class="wrap">
     <header>
       <div class="logo">NEM<em>//</em>FILE</div>
       <div class="header-right">
         <span class="pulse"></span>ONLINE · :${PORT}<br>
         ${publicUrl ? '<span style="color:var(--accent)">// PUBLIC TUNNEL ACTIVE</span>' : '// LAN ONLY'}<br>
-        SCREENSHOT TRANSFER SYS
+        LOCAL FILE TRANSFER SYS
       </div>
     </header>
 
@@ -607,6 +645,19 @@ app.get('/', async (req, res) => {
     <div class="gallery" id="gallery">
       ${files.length === 0 ? '<p class="empty">// NO FILES TRANSFERRED</p>' : gallery}
     </div>
+  </div>
+
+  <div class="qr-group">
+    <div class="qr">
+      <img src="${qrLan}" alt="LAN QR">
+      <div class="qr-tag">// LAN</div>
+      <div class="qr-url">${lanUrl}</div>
+    </div>
+    ${qrPublic ? `<div class="qr tunnel">
+      <img src="${qrPublic}" alt="Public QR">
+      <div class="qr-tag">// PUBLIC</div>
+      <div class="qr-url">${publicUrl}</div>
+    </div>` : ''}
   </div>
 
   <script>
