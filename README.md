@@ -13,6 +13,10 @@ That's it. Open the printed URL or scan the QR code on your phone. Files land in
 [![license](https://img.shields.io/npm/l/nemfile.svg)](./LICENSE)
 [![node](https://img.shields.io/node/v/nemfile.svg)](https://nodejs.org)
 
+![nemfile web interface showing the drag-and-drop file upload area, cross-device text clipboard, a gallery of transferred photos, screenshots and video, and QR codes for the LAN and public tunnel URLs](https://raw.githubusercontent.com/quytstudio/nemfile/master/docs/screenshot.jpg)
+
+<sub>The page you open on your phone and on your computer — drop zone, shared text clips, transfer log, and the two pairing QR codes.</sub>
+
 ---
 
 ## Why nemfile
