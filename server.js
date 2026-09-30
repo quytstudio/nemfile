@@ -47,7 +47,9 @@ async function printQR(label, url) {
   // QR code anyway, and qrcode's own renderer doesn't check isTTY, so it
   // would otherwise dump raw ANSI block-art escapes into the log.
   if (!isTTY) return;
-  const qr = await QRCode.toString(url, { type: 'terminal', small: true });
+  // Lower error correction (L) instead of the default (M) — less redundant
+  // data means fewer QR modules for the same URL, so it prints smaller.
+  const qr = await QRCode.toString(url, { type: 'terminal', small: true, errorCorrectionLevel: 'L' });
   console.log(`  ${c.dim(label)}`);
   console.log(qr.split('\n').map(l => '  ' + l).join('\n'));
 }
@@ -994,10 +996,12 @@ app.listen(PORT, '0.0.0.0', async () => {
   // the gallery at once.
   const tunnel = Tunnel.quick(`http://localhost:${PORT}`);
 
-  tunnel.once('url', async url => {
+  tunnel.once('url', url => {
     publicUrl = url;
-    console.log('  Public:  ' + publicUrl + '  ← use this outside LAN\n');
-    await printQR('Scan from anywhere (public):', url);
+    // No terminal QR here: the public tunnel URL is long (random Cloudflare
+    // subdomain), which makes for an oversized QR, and the web page opened
+    // from the LAN QR above already shows a properly-sized one for it.
+    console.log('  Public:  ' + publicUrl + '  ← use this outside LAN');
     printFooter();
   });
   tunnel.on('error', err => {
