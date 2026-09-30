@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
-const localtunnel = require('localtunnel');
+const { Tunnel } = require('cloudflared');
 
 const app = express();
 const PORT = 3333;
@@ -81,7 +81,7 @@ app.get('/', async (req, res) => {
         <div class="thumb-meta">${f}</div>
       </a>
       <a class="thumb-dl" href="${url}" download="${f}" title="Download">↓</a>
-      <button class="thumb-ln" data-url="${url}" onclick="copyLink(this)" title="Copy LAN link">URL</button>
+      <button class="thumb-ln" data-url="${url}" onclick="copyLink(this)" title="Copy link">URL</button>
       ${copyBtn}
     </div>`;
   }).join('');
@@ -536,7 +536,10 @@ app.get('/', async (req, res) => {
       border-left:2px solid var(--accent);
     }
     .qr.tunnel::before { border-color: var(--accent); }
-    .qr img { display:block; width:96px; height:96px; }
+    .qr a { display: block; color: inherit; text-decoration: none; cursor: pointer; }
+    .qr img { display:block; width:96px; height:96px; transition: opacity .15s; }
+    .qr a:hover img { opacity: .8; }
+    .qr a:hover .qr-tag { color: var(--accent); }
     .qr-tag {
       font-size: 0.5rem;
       text-transform: uppercase;
@@ -649,19 +652,22 @@ app.get('/', async (req, res) => {
 
   <div class="qr-group">
     <div class="qr">
-      <img src="${qrLan}" alt="LAN QR">
-      <div class="qr-tag">// LAN</div>
-      <div class="qr-url">${lanUrl}</div>
+      <a href="${lanUrl}" target="_blank" rel="noopener" title="Open ${lanUrl}">
+        <img src="${qrLan}" alt="LAN QR">
+        <div class="qr-tag">// LAN</div>
+        <div class="qr-url">${lanUrl}</div>
+      </a>
     </div>
     ${qrPublic ? `<div class="qr tunnel">
-      <img src="${qrPublic}" alt="Public QR">
-      <div class="qr-tag">// PUBLIC</div>
-      <div class="qr-url">${publicUrl}</div>
+      <a href="${publicUrl}" target="_blank" rel="noopener" title="Open ${publicUrl}">
+        <img src="${qrPublic}" alt="Public QR">
+        <div class="qr-tag">// PUBLIC</div>
+        <div class="qr-url">${publicUrl}</div>
+      </a>
     </div>` : ''}
   </div>
 
   <script>
-    const LAN_BASE = '${lanUrl}';
     const input = document.getElementById('fileInput');
     const statusEl = document.getElementById('status');
     const dropzone = document.getElementById('dropzone');
@@ -742,7 +748,7 @@ app.get('/', async (req, res) => {
         : '';
       const div = document.createElement('div');
       div.className = 'thumb' + (isNew ? ' thumb-new' : '');
-      div.innerHTML = '<a href="' + url + '" target="_blank">' + preview + '<div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Download">↓</a><button class="thumb-ln" data-url="' + url + '" onclick="copyLink(this)" title="Copy LAN link">URL</button>' + copyBtn;
+      div.innerHTML = '<a href="' + url + '" target="_blank">' + preview + '<div class="thumb-meta">' + filename + '</div></a><a class="thumb-dl" href="' + url + '" download="' + filename + '" title="Download">↓</a><button class="thumb-ln" data-url="' + url + '" onclick="copyLink(this)" title="Copy link">URL</button>' + copyBtn;
       gallery.prepend(div);
       countEl.textContent = gallery.querySelectorAll('.thumb').length;
       if (isNew) setTimeout(() => div.classList.remove('thumb-new'), 4000);
@@ -803,11 +809,14 @@ app.get('/', async (req, res) => {
       flashBtn(btn, ok ? 'OK' : 'ERR', 'ok');
     }
 
-    // Copy the file's LAN address, e.g. http://192.168.1.10:3333/uploads/x.png
+    // Copy the file's address using the origin the visitor is actually on
+    // (localhost, the LAN IP, or the public tunnel) — not a fixed LAN address,
+    // so the copied link still works for whoever pasted it.
     async function copyLink(btn) {
-      const ok = await copyText(LAN_BASE + btn.dataset.url);
+      const fullUrl = location.origin + btn.dataset.url;
+      const ok = await copyText(fullUrl);
       flashBtn(btn, ok ? 'OK' : 'ERR', 'copied');
-      setStatus(ok ? '// LINK COPIED — ' + LAN_BASE + btn.dataset.url : '// COPY FAILED', ok);
+      setStatus(ok ? '// LINK COPIED — ' + fullUrl : '// COPY FAILED', ok);
       setTimeout(() => setStatus('// AWAITING INPUT', false), 3000);
     }
 
@@ -897,22 +906,23 @@ app.listen(PORT, '0.0.0.0', async () => {
   }
 
   console.log('\n  Starting public tunnel...');
-  try {
-    const tunnel = await localtunnel({ port: PORT });
-    publicUrl = tunnel.url;
-    console.log('  Public:  ' + publicUrl + '  ← use this outside LAN\n');
-    console.log('  (First visit may ask for confirmation — click "Click to Continue")\n');
 
-    tunnel.on('close', () => {
-      publicUrl = null;
-      console.log('  Tunnel closed.');
-    });
-    tunnel.on('error', err => {
-      publicUrl = null;
-      console.error('  Tunnel error:', err.message);
-    });
-  } catch (err) {
-    console.error('  Could not create tunnel:', err.message);
-    console.log('  → LAN only.\n');
-  }
+  // Quick Tunnel (trycloudflare.com): anonymous, no Cloudflare account, no
+  // DNS setup — the binary itself is fetched automatically on `npm install`.
+  // Unlike the localtunnel relay this replaced, it doesn't silently die after
+  // a couple of requests, so a phone and a computer can both stay open on
+  // the gallery at once.
+  const tunnel = Tunnel.quick(`http://localhost:${PORT}`);
+
+  tunnel.once('url', url => {
+    publicUrl = url;
+    console.log('  Public:  ' + publicUrl + '  ← use this outside LAN\n');
+  });
+  tunnel.on('error', err => {
+    console.error('  Tunnel error:', err.message);
+  });
+  tunnel.on('exit', () => {
+    publicUrl = null;
+    console.log('  Tunnel closed.');
+  });
 });

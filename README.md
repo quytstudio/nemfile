@@ -40,7 +40,7 @@ Getting a screenshot off an iPhone and onto a Windows or Linux machine usually m
 | Text clips | Paste text on one device, read it on another — a cross-platform clipboard |
 | One-click copy | Copy an image to the system clipboard, or copy its LAN URL |
 | Download buttons | Grab any uploaded file back down to whatever device you're on |
-| Public tunnel | Optional `localtunnel` URL so the page works outside your Wi-Fi |
+| Public tunnel | Optional Cloudflare Tunnel URL so the page works outside your Wi-Fi |
 | Standalone binaries | Prebuilt executables for Linux, macOS and Windows — no Node needed |
 
 ## Install
@@ -86,7 +86,7 @@ nemfile prints three addresses:
 ```
   Local:   http://localhost:3333
   LAN:     http://192.168.1.10:3333      ← open this on your phone
-  Public:  https://xxxx.loca.lt          ← works outside your Wi-Fi
+  Public:  https://xxxx.trycloudflare.com ← works outside your Wi-Fi
 ```
 
 Open the **LAN** address on your phone — or scan the QR code shown on the page — and you get an upload box. Anything you drop there appears in the gallery on every connected device, and is written to `uploads/` on your computer.
@@ -95,7 +95,7 @@ To share text instead of a file, paste into the text box and hit send; it shows 
 
 ## How it works
 
-nemfile starts a small Express server on port `3333` bound to `0.0.0.0`, so any device on the same Wi-Fi can reach it. Uploads are handled by `multer` and written to `./uploads`. A server-sent-events stream keeps every open browser tab in sync, and `qrcode` renders the pairing QR codes. Optionally, `localtunnel` exposes the same page on a public HTTPS URL for when the two devices aren't on the same network.
+nemfile starts a small Express server on port `3333` bound to `0.0.0.0`, so any device on the same Wi-Fi can reach it. Uploads are handled by `multer` and written to `./uploads`. A server-sent-events stream keeps every open browser tab in sync, and `qrcode` renders the pairing QR codes. Optionally, a Cloudflare Tunnel (no account needed) exposes the same page on a public HTTPS URL for when the two devices aren't on the same network.
 
 There is no database, no telemetry, and no external service in the default path — the LAN transfer is a direct HTTP request from your phone to your computer.
 
@@ -111,7 +111,7 @@ Yes — it covers the same job (send a file to a nearby device) but works betwee
 
 ### Do my files get uploaded to a cloud server?
 
-No. By default the transfer stays entirely on your local network. Files are saved to a folder on your own computer. The only exception is the optional public tunnel, which relays traffic through `loca.lt` so devices outside your Wi-Fi can reach the page — skip it if you don't need it.
+No. By default the transfer stays entirely on your local network. Files are saved to a folder on your own computer. The only exception is the optional public tunnel, which relays traffic through Cloudflare so devices outside your Wi-Fi can reach the page — skip it if you don't need it.
 
 ### What's the maximum file size?
 

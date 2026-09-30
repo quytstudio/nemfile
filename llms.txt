@@ -31,7 +31,7 @@ Install and run with a single command: `npx nemfile`. It starts a local Express 
 - Realtime sync across all connected devices via server-sent events
 - Text clip sharing
 - Copy an image to the system clipboard, or copy its LAN URL
-- Optional public HTTPS tunnel (localtunnel) for devices outside the Wi-Fi network
+- Optional public HTTPS tunnel (Cloudflare Tunnel, no account needed) for devices outside the Wi-Fi network
 
 ## Privacy
 
