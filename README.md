@@ -93,6 +93,16 @@ Open the **LAN** address on your phone — or scan the QR code shown on the page
 
 To share text instead of a file, paste into the text box and hit send; it shows up as a clip on every other device.
 
+### Flags
+
+| Flag | Effect |
+| --- | --- |
+| `--no-tunnel` | Don't start the public Cloudflare Tunnel — LAN only. |
+
+```bash
+npx nemfile --no-tunnel
+```
+
 ## How it works
 
 nemfile starts a small Express server on port `3333` bound to `0.0.0.0`, so any device on the same Wi-Fi can reach it. Uploads are handled by `multer` and written to `./uploads`. A server-sent-events stream keeps every open browser tab in sync, and `qrcode` renders the pairing QR codes. Optionally, a Cloudflare Tunnel (no account needed) exposes the same page on a public HTTPS URL for when the two devices aren't on the same network.
