@@ -7,24 +7,29 @@ on:
 
 jobs:
   # ── 1. Publish to npm ───────────────────────────────────────────
+  # Uses npm Trusted Publishing (OIDC) — configured on the package's
+  # settings on npmjs.com (org=quytstudio, repo=nemfile, workflow=release.yml).
+  # No NPM_TOKEN secret needed: the npm CLI exchanges the id-token below for
+  # a short-lived publish credential itself. Requires npm >=11.5.1 and
+  # Node >=22.14.0, hence the version bump and the explicit npm upgrade.
   npm-publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # required for OIDC trusted publishing + provenance
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
       - run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ── 2. Build binaries for 3 platforms ───────────────────────────
   build-binaries:
