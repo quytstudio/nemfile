@@ -8,7 +8,7 @@ Install and run with a single command: `npx nemfile`. It starts a local Express 
 
 - Package name (npm): `nemfile`
 - Run command: `npx nemfile`, or `npm install -g nemfile` then `nemfile`
-- Flags: `--no-tunnel` disables the public Cloudflare Tunnel and runs LAN-only
+- Flags: `--no-tunnel` (or `-L`) disables the public Cloudflare Tunnel and runs LAN-only
 - License: MIT
 - Author: phamquyetthang
 - Repository: https://github.com/quytstudio/nemfile

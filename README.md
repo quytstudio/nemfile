@@ -97,10 +97,11 @@ To share text instead of a file, paste into the text box and hit send; it shows 
 
 | Flag | Effect |
 | --- | --- |
-| `--no-tunnel` | Don't start the public Cloudflare Tunnel — LAN only. |
+| `--no-tunnel`, `-L` | Don't start the public Cloudflare Tunnel — LAN only. |
 
 ```bash
 npx nemfile --no-tunnel
+npx nemfile -L            # same thing, shorter
 ```
 
 ### CLI / scripting (curl, no browser)

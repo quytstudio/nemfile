@@ -8,7 +8,7 @@ const { Tunnel } = require('cloudflared');
 
 const app = express();
 const PORT = 3333;
-const NO_TUNNEL = process.argv.includes('--no-tunnel');
+const NO_TUNNEL = process.argv.includes('--no-tunnel') || process.argv.includes('-L');
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
@@ -924,7 +924,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   }
 
   if (NO_TUNNEL) {
-    console.log('\n  Public tunnel disabled (--no-tunnel) — LAN only.\n');
+    console.log('\n  Public tunnel disabled — LAN only.\n');
     return;
   }
 
