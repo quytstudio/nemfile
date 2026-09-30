@@ -42,18 +42,6 @@ function printBanner() {
   console.log('');
 }
 
-async function printQR(label, url) {
-  // Skip when not a real terminal — a log file or piped output can't scan a
-  // QR code anyway, and qrcode's own renderer doesn't check isTTY, so it
-  // would otherwise dump raw ANSI block-art escapes into the log.
-  if (!isTTY) return;
-  // Lower error correction (L) instead of the default (M) — less redundant
-  // data means fewer QR modules for the same URL, so it prints smaller.
-  const qr = await QRCode.toString(url, { type: 'terminal', small: true, errorCorrectionLevel: 'L' });
-  console.log(`  ${c.dim(label)}`);
-  console.log(qr.split('\n').map(l => '  ' + l).join('\n'));
-}
-
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 
 const storage = multer.diskStorage({
@@ -980,7 +968,14 @@ app.listen(PORT, '0.0.0.0', async () => {
   }
 
   console.log('');
-  await printQR('Scan on your phone (LAN):', `http://${getLocalIP()}:${PORT}`);
+  const label = s => c.dim(s.padEnd(10));
+  const blank = ' '.repeat(10);
+  const method = s => s.padEnd(5);
+  const path = s => s.padEnd(16);
+
+  console.log('  ' + label('Flags') + '--no-tunnel, -L'.padEnd(16) + 'LAN only, skip the public tunnel');
+  console.log('  ' + label('API') + method('GET') + path('/api/files') + 'list uploaded files as JSON');
+  console.log('  ' + blank + method('POST') + path('/upload') + 'upload a file (multipart field "image")');
 
   if (NO_TUNNEL) {
     console.log('\n  Public tunnel disabled — LAN only.');
@@ -998,9 +993,6 @@ app.listen(PORT, '0.0.0.0', async () => {
 
   tunnel.once('url', url => {
     publicUrl = url;
-    // No terminal QR here: the public tunnel URL is long (random Cloudflare
-    // subdomain), which makes for an oversized QR, and the web page opened
-    // from the LAN QR above already shows a properly-sized one for it.
     console.log('  Public:  ' + publicUrl + '  ← use this outside LAN');
     printFooter();
   });
