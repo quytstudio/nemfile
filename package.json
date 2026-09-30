@@ -1,6 +1,6 @@
 {
   "name": "nemfile",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Send files, screenshots and text between your phone, iPad and computer over local Wi-Fi \u2014 no cloud, no account, no app install. One command: npx nemfile.",
   "keywords": [
     "file-transfer",
