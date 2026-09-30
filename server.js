@@ -6,10 +6,51 @@ const os = require('os');
 const QRCode = require('qrcode');
 const { Tunnel } = require('cloudflared');
 
+const pkg = require('./package.json');
+
 const app = express();
 const PORT = 3333;
 const NO_TUNNEL = process.argv.includes('--no-tunnel') || process.argv.includes('-L');
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+
+// Colorize only when writing to a real terminal — an interactive TTY. Piped
+// or redirected output (`nemfile > log.txt`, Docker logs, CI) gets plain text
+// instead of raw escape codes.
+const isTTY = process.stdout.isTTY;
+const c = {
+  orange: s => (isTTY ? `\x1b[38;5;208m${s}\x1b[0m` : s),
+  bold: s => (isTTY ? `\x1b[1m${s}\x1b[0m` : s),
+  dim: s => (isTTY ? `\x1b[2m${s}\x1b[0m` : s),
+  green: s => (isTTY ? `\x1b[32m${s}\x1b[0m` : s),
+};
+
+function printBanner() {
+  const logoPlain = 'NEM//FILE';
+  const tagline = `local file transfer · v${pkg.version}`;
+  const innerWidth = Math.max(logoPlain.length, tagline.length) + 2;
+  const pad = s => s + ' '.repeat(innerWidth - s.length);
+  // Built by hand instead of composing c.bold()/c.orange() naively: the
+  // inner reset from orange('//') would also clear bold before "FILE".
+  const logoColored = isTTY ? `\x1b[1mNEM\x1b[38;5;208m//\x1b[39mFILE\x1b[0m` : logoPlain;
+
+  console.log('');
+  console.log('  ╭' + '─'.repeat(innerWidth) + '╮');
+  console.log('  │ ' + logoColored + ' '.repeat(innerWidth - logoPlain.length - 1) + '│');
+  console.log('  │ ' + c.dim(pad(tagline).slice(0, -1)) + '│');
+  console.log('  ╰' + '─'.repeat(innerWidth) + '╯');
+  console.log('');
+}
+
+async function printQR(label, url) {
+  // Skip when not a real terminal — a log file or piped output can't scan a
+  // QR code anyway, and qrcode's own renderer doesn't check isTTY, so it
+  // would otherwise dump raw ANSI block-art escapes into the log.
+  if (!isTTY) return;
+  const qr = await QRCode.toString(url, { type: 'terminal', small: true });
+  console.log(`  ${c.dim(label)}`);
+  console.log(qr.split('\n').map(l => '  ' + l).join('\n'));
+}
 
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 
@@ -22,7 +63,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2GB
+const upload = multer({ storage, limits: { fileSize: MAX_FILE_SIZE } });
 
 const sseClients = new Set();
 const textClips = []; // in-memory, max 50
@@ -911,8 +952,21 @@ app.post('/upload', upload.single('image'), (req, res) => {
   res.json({ ok: true, ...payload });
 });
 
+function printFooter() {
+  console.log('');
+  console.log(c.dim('  Press Ctrl+C to stop'));
+  console.log('');
+}
+
 app.listen(PORT, '0.0.0.0', async () => {
-  console.log('\nnemfile is running:\n');
+  printBanner();
+
+  const sizeGB = MAX_FILE_SIZE / 1024 / 1024 / 1024;
+
+  console.log('  ' + c.green('●') + ' ONLINE   ' + c.dim('port ' + PORT));
+  console.log('  ' + c.dim('mode      ') + (NO_TUNNEL ? 'LAN only (--no-tunnel)' : 'LAN + public tunnel'));
+  console.log('  ' + c.dim('uploads   ') + UPLOADS_DIR + c.dim(`  (max ${sizeGB}GB/file)`));
+  console.log('');
   console.log('  Local:   http://localhost:' + PORT);
 
   for (const list of Object.values(os.networkInterfaces())) {
@@ -923,9 +977,12 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
   }
 
+  console.log('');
+  await printQR('Scan on your phone (LAN):', `http://${getLocalIP()}:${PORT}`);
+
   if (NO_TUNNEL) {
-    console.log('\n  Public tunnel disabled — LAN only.\n');
-    return;
+    console.log('\n  Public tunnel disabled — LAN only.');
+    return printFooter();
   }
 
   console.log('\n  Starting public tunnel...');
@@ -937,9 +994,11 @@ app.listen(PORT, '0.0.0.0', async () => {
   // the gallery at once.
   const tunnel = Tunnel.quick(`http://localhost:${PORT}`);
 
-  tunnel.once('url', url => {
+  tunnel.once('url', async url => {
     publicUrl = url;
     console.log('  Public:  ' + publicUrl + '  ← use this outside LAN\n');
+    await printQR('Scan from anywhere (public):', url);
+    printFooter();
   });
   tunnel.on('error', err => {
     console.error('  Tunnel error:', err.message);
