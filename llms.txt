@@ -33,6 +33,15 @@ Install and run with a single command: `npx nemfile`. It starts a local Express 
 - Text clip sharing
 - Copy an image to the system clipboard, or copy its LAN URL
 - Optional public HTTPS tunnel (Cloudflare Tunnel, no account needed) for devices outside the Wi-Fi network
+- Scriptable from a shell with plain curl — no browser required
+
+## CLI / API (curl-friendly, no browser needed)
+
+- `POST /upload` — multipart upload, field name `image` (any file type). Returns `{ok, filename, url}`.
+- `GET /api/files` — JSON list of every file on the server: `{ok, files: [{filename, url, size, uploadedAt}]}`.
+- `GET /uploads/<filename>` — download a file directly (static file serving).
+
+Example: `curl -F "image=@photo.png" http://<host>:3333/upload` then `curl http://<host>:3333/api/files`.
 
 ## Privacy
 

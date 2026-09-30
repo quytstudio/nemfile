@@ -884,6 +884,23 @@ app.delete('/clear', (req, res) => {
   res.json({ ok: true, deleted: files.length });
 });
 
+// JSON file listing for scripts/CLI use — curl http://host:3333/api/files
+app.get('/api/files', (req, res) => {
+  const files = fs.readdirSync(UPLOADS_DIR).sort().reverse();
+  res.json({
+    ok: true,
+    files: files.map(f => {
+      const stat = fs.statSync(path.join(UPLOADS_DIR, f));
+      return {
+        filename: f,
+        url: '/uploads/' + f,
+        size: stat.size,
+        uploadedAt: stat.mtime.toISOString(),
+      };
+    }),
+  });
+});
+
 app.post('/upload', upload.single('image'), (req, res) => {
   if (!req.file) return res.json({ ok: false, error: 'No file received' });
   const payload = { filename: req.file.filename, url: '/uploads/' + req.file.filename };

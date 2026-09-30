@@ -103,6 +103,27 @@ To share text instead of a file, paste into the text box and hit send; it shows 
 npx nemfile --no-tunnel
 ```
 
+### CLI / scripting (curl, no browser)
+
+Every route works from a plain shell, so a headless machine can push and pull files without opening the page at all.
+
+```bash
+# Upload a file — the multipart field must be named "image" (any file type works)
+curl -F "image=@photo.png" http://192.168.1.10:3333/upload
+# {"ok":true,"filename":"1699999999999-photo.png","url":"/uploads/1699999999999-photo.png"}
+
+# List everything currently on the server, as JSON
+curl http://192.168.1.10:3333/api/files
+# {"ok":true,"files":[{"filename":"...","url":"/uploads/...","size":12345,"uploadedAt":"2026-...Z"}]}
+
+# Download a file
+curl -O http://192.168.1.10:3333/uploads/1699999999999-photo.png
+
+# List + download every file in one line (needs jq)
+curl -s http://192.168.1.10:3333/api/files | jq -r '.files[].url' | \
+  while read -r u; do curl -sO "http://192.168.1.10:3333$u"; done
+```
+
 ## How it works
 
 nemfile starts a small Express server on port `3333` bound to `0.0.0.0`, so any device on the same Wi-Fi can reach it. Uploads are handled by `multer` and written to `./uploads`. A server-sent-events stream keeps every open browser tab in sync, and `qrcode` renders the pairing QR codes. Optionally, a Cloudflare Tunnel (no account needed) exposes the same page on a public HTTPS URL for when the two devices aren't on the same network.
@@ -146,6 +167,10 @@ Port `3333`, bound to all interfaces so other devices on the network can connect
 ### Where are uploaded files saved?
 
 In an `uploads/` directory created inside the folder you ran the command from. `cd` somewhere else first if you want them elsewhere.
+
+### Can I upload or list files from a script or a headless machine, without a browser?
+
+Yes. `POST /upload` (multipart field `image`) and `GET /api/files` (JSON listing) both work from plain `curl` — see [CLI / scripting](#cli--scripting-curl-no-browser) above. Nothing about nemfile requires a browser; the web page is just the most convenient client for a phone.
 
 ### Is it safe to leave running?
 
