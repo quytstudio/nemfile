@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
-const { Tunnel } = require('cloudflared');
 
 const pkg = require('./package.json');
 
@@ -984,12 +983,31 @@ app.listen(PORT, '0.0.0.0', async () => {
 
   console.log('\n  Starting public tunnel...');
 
+  // cloudflared is an optional dependency: its postinstall downloads a ~40MB
+  // binary and can fail on slow or blocked networks. Load it only when a
+  // tunnel is actually requested so LAN-only mode always starts cleanly.
+  let Tunnel;
+  try {
+    ({ Tunnel } = require('cloudflared'));
+  } catch (err) {
+    console.error('  Tunnel unavailable: cloudflared could not be loaded (' + err.message + ')');
+    console.error('  LAN mode is still active — use the Local/LAN URL above.');
+    return printFooter();
+  }
+
   // Quick Tunnel (trycloudflare.com): anonymous, no Cloudflare account, no
   // DNS setup — the binary itself is fetched automatically on `npm install`.
   // Unlike the localtunnel relay this replaced, it doesn't silently die after
   // a couple of requests, so a phone and a computer can both stay open on
   // the gallery at once.
-  const tunnel = Tunnel.quick(`http://localhost:${PORT}`);
+  let tunnel;
+  try {
+    tunnel = Tunnel.quick(`http://localhost:${PORT}`);
+  } catch (err) {
+    console.error('  Tunnel failed to start:', err.message);
+    console.error('  LAN mode is still active — use the Local/LAN URL above.');
+    return printFooter();
+  }
 
   tunnel.once('url', url => {
     publicUrl = url;
@@ -998,6 +1016,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   });
   tunnel.on('error', err => {
     console.error('  Tunnel error:', err.message);
+    console.error('  LAN mode is still active — use the Local/LAN URL above.');
   });
   tunnel.on('exit', () => {
     publicUrl = null;
